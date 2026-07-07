@@ -92,9 +92,9 @@ class App:
             [("Clearance", lambda: self._tap("ToggleDoorClearance")),
              ("Kneel v", lambda: self._tap("KneelDown")),
              ("Kneel ^", lambda: self._tap("KneelUp"))],
-            [("< Ind", lambda: self._tap("SetIndicatorDown")),
-             ("Ind off", lambda: self._tap("SetIndicatorOff")),
-             ("Ind >", lambda: self._tap("SetIndicatorUp"))],
+            [("< Ind", lambda: self._indicate(-1)),
+             ("Ind off", lambda: self._indicate(0)),
+             ("Ind >", lambda: self._indicate(1))],
             [("Warning", lambda: self._tap("ToggleWarningLights")),
              ("Lights", lambda: self._tap("Lightswitch")),
              ("Wiper", lambda: self._tap("WiperUp"))],
@@ -138,6 +138,11 @@ class App:
     def _hold(self, event: str):
         threading.Thread(target=lambda: self._safe(
             lambda: self.bridge.hold(event, 0.4)), daemon=True).start()
+
+    def _indicate(self, want: int):
+        """Vehicle-adaptive indicator (direct events or stalk notches)."""
+        threading.Thread(target=lambda: self._safe(
+            lambda: self.bridge.indicate(want)), daemon=True).start()
 
     def _event(self, event: str, mode: str):
         threading.Thread(target=lambda: self._safe(

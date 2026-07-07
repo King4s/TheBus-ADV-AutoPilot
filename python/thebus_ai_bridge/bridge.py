@@ -202,8 +202,48 @@ class Telemetry:
         b = self.button(name)
         return (b or {}).get("State", "")
 
+    # -- per-vehicle capability discovery ---------------------------------
+    # Buses differ: different cockpit button names, different event sets
+    # (Scania has SetIndicatorOff, the MAN DD only has stalk notches),
+    # different lamp names (thatzok/TheBusTelemetry documents the same
+    # aliases). Never assume - ask the vehicle.
+    @property
+    def events(self) -> set:
+        """Every input event THIS bus accepts (union of Buttons Actions)."""
+        out = set()
+        for b in self.buttons:
+            out.update(a for a in (b.get("Actions") or []) if a != "None")
+        return out
+
+    def has_event(self, name: str) -> bool:
+        return name in self.events
+
+    def button_like(self, *candidates: str) -> dict | None:
+        """First button matching a candidate name - exact first, then
+        case-insensitive substring. Buses name the same control
+        differently ('Fake Ignition' vs 'Ignition' ...)."""
+        for cand in candidates:
+            b = self.button(cand)
+            if b is not None:
+                return b
+        for cand in candidates:
+            low = cand.lower()
+            for b in self.buttons:
+                if low in str(b.get("Name", "")).lower():
+                    return b
+        return None
+
     def lamp(self, name: str) -> float:
         return float((self.vehicle.get("AllLamps") or {}).get(name, 0.0))
+
+    def lamp_any(self, *names: str) -> float:
+        """First present lamp among aliases (0.0 when none exists -
+        e.g. the MAN Lion's City has no stop-brake button light)."""
+        lamps = self.vehicle.get("AllLamps") or {}
+        for n in names:
+            if n in lamps:
+                return float(lamps[n])
+        return 0.0
 
     # -- world / mission ---------------------------------------------------
     @property
@@ -458,6 +498,31 @@ class TheBusBridge:
         ``Buttons[].Name`` / ``Buttons[].States`` in the vehicle telemetry."""
         q = urllib.parse.urlencode({"button": name, "state": state})
         self._get(f"{self._vehicle_path()}/setbutton?{q}", parse=False)
+
+    def indicate(self, want: int, tries: int = 6, settle_s: float = 0.15):
+        """Put the indicator into ``want`` (-1 left, 0 off, +1 right),
+        adapting to the bus: some vehicles have direct events
+        (SetIndicatorUp/Down/Off, e.g. Scania Citywide), others only
+        stalk notches (IndicatorUp/Down, e.g. MAN Lion's City DD).
+        Verifies against telemetry and retries; returns True on success.
+        Blocks up to tries*settle_s - use from UI/tool code, not from a
+        control loop."""
+        direct = {1: "SetIndicatorUp", -1: "SetIndicatorDown",
+                  0: "SetIndicatorOff"}
+        for _ in range(tries):
+            t = self.read()
+            cur = t.indicator
+            if cur == want:
+                return True
+            acts = set((t.button("Indicator") or {}).get("Actions") or [])
+            if direct[want] in acts:
+                self.tap(direct[want])
+            elif want > cur:
+                self.tap("IndicatorUp")
+            else:
+                self.tap("IndicatorDown")
+            time.sleep(settle_s)
+        return self.read().indicator == want
 
     def command(self, command: str):
         """Game-level command endpoint (GET /command?Command=...)."""

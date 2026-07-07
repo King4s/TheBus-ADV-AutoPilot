@@ -80,6 +80,30 @@ def main():
     t = bridge.read()
     check("warning lights on", t.warning_lights is True)
 
+    print("indicator (vehicle-adaptive):")
+    game.events.clear()
+    check("indicate right", bridge.indicate(1, settle_s=0.01) is True)
+    check("direct event used (Scania-style)",
+          ("SetIndicatorUp", "push") in game.events)
+    for b in game.vehicle["Buttons"]:  # MAN-style: stalk notches only
+        if b["Name"] == "Indicator":
+            b["Actions"] = ["IndicatorDown", "IndicatorUp", "None"]
+    game.events.clear()
+    check("indicate left on a stalk-only bus",
+          bridge.indicate(-1, settle_s=0.01) is True)
+    check("stalk notched twice (right -> off -> left)",
+          game.events.count(("IndicatorDown", "push")) == 2)
+    check("capability discovery: events set",
+          not bridge.read().has_event("SetIndicatorOff"))
+    for b in game.vehicle["Buttons"]:
+        if b["Name"] == "Indicator":
+            b["Actions"] = ["SetIndicatorOff", "SetIndicatorDown",
+                            "SetIndicatorUp", "None"]
+    check("back to off", bridge.indicate(0, settle_s=0.01) is True)
+    check("button_like finds by substring",
+          (bridge.read().button_like("gear select") or {})
+          .get("Name") == "Gear Selector")
+
     print("buttons:")
     bridge.set_button("Wiper", "Interval")
     check("setbutton recorded",

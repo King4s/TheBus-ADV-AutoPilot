@@ -76,12 +76,21 @@ _D = {  # event -> telemetry predicate that lights the key (state 1)
     "SetIndicatorUp": lambda t: t.indicator == 1,
     "IndicatorDown": lambda t: t.indicator == -1,
     "IndicatorUp": lambda t: t.indicator == 1,
-    "Lightswitch": lambda t: t.button_state("Light Switch")
-    not in ("", "Off"),
-    "StopBrakeOnOff": lambda t: t.lamp("ButtonLight BusStopBrake") > 0.5,
-    "ToggleDoorClearance": lambda t: t.button_state("Door Clearance")
-    == "Secondary",
+    "Lightswitch": lambda t: (t.button_like("Light Switch", "Lightswitch")
+                              or {}).get("State", "") not in ("", "Off"),
+    # lamp names differ per bus - try the known aliases
+    "StopBrakeOnOff": lambda t: t.lamp_any(
+        "ButtonLight BusStopBrake", "LED Stop Brake", "LightStopBrake") > 0.5,
+    "ToggleDoorClearance": lambda t: (
+        (t.button_like("Door Clearance") or {}).get("State") == "Secondary"
+        or t.lamp_any("ButtonLight DoorClearance",
+                      "DoorClearanceButton") > 0.5),
 }
+
+# indicator events routed through the vehicle-adaptive helper (some buses
+# only have stalk notches, no direct set events)
+_INDICATE = {"SetIndicatorDown": -1, "SetIndicatorOff": 0,
+             "SetIndicatorUp": 1}
 
 
 def _door(t, i: int) -> bool:
@@ -274,7 +283,10 @@ class Plugin:
         if bool(settings.get("hold")):      # hold while the key is down
             self.bridge.send_event(event, "press" if down else "release")
         elif down:
-            self.bridge.tap(event)
+            if event in _INDICATE:          # adapt to the bus at hand
+                self.bridge.indicate(_INDICATE[event])
+            else:
+                self.bridge.tap(event)
 
     # -- live key updates --------------------------------------------------------
     def _update_loop(self):

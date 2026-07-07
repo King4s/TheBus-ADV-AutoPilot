@@ -146,9 +146,11 @@ class Autopilot:
         self._holding = False         # driver_override yield
         self._brake_ticks = 0
         self._lights_by_us = None     # state we last commanded
+        self._lights_warned = False   # said "no light switch" once
         self._fix_tap_at = 0.0        # last fixing-brake release attempt
         self._lights_pause_until = 0.0
         self._indicated_stop = None   # StopName we already signaled for
+        self._blinker_owned = False   # WE switched the indicator on
         self._engine_was_on = False
         self._limiter_active = False
         self._stopped_at = None       # StopName we are currently serving
@@ -205,15 +207,19 @@ class Autopilot:
                 self._pad.neutral()
             except Exception:
                 pass
-        for ev in list(self._doors_by_us):
-            pass  # doors stay as they are - never slam them on release
-        self._doors_by_us = []
+        self._doors_by_us = []  # doors stay as they are - never slam them
         if self._hazards_by_us:
             self._try_tap("ToggleWarningLights")
             self._hazards_by_us = False
         if self._hold_by_us:
             self._try_tap("StopBrakeOnOff")
             self._hold_by_us = False
+        if self._blinker_owned:  # never leave OUR blinker flashing
+            try:
+                self.bridge.indicate(0, tries=4)
+            except BridgeError:
+                pass
+            self._blinker_owned = False
 
     # -- toggles (thread-safe, persisted with autosave) ------------------------
     def set_feature(self, name: str, on: bool):
@@ -322,15 +328,43 @@ class Autopilot:
             return
 
         self._mode = "drive"
+        # a blinker we own has no reason left (interrupted approach or
+        # depart, feature toggled off, ...) - take it back off
+        if self._blinker_owned and self._signal(t, 0):
+            self._blinker_owned = False
         self._speed_control(t)
+
+    # -- vehicle-adaptive signaling ---------------------------------------------
+    def _signal(self, t: Telemetry, want: int) -> bool:
+        """One step toward indicator state ``want`` (-1/0/+1), adapted to
+        THIS bus: direct events when it has them, stalk notches
+        (IndicatorUp/Down) otherwise. Returns True once telemetry
+        confirms - call again next tick until it does."""
+        cur = t.indicator
+        if cur == want:
+            return True
+        acts = t.events
+        direct = {1: "SetIndicatorUp", -1: "SetIndicatorDown",
+                  0: "SetIndicatorOff"}[want]
+        if direct in acts:
+            self._try_tap(direct)
+        elif want > cur:
+            self._try_tap("IndicatorUp")
+        else:
+            self._try_tap("IndicatorDown")
+        return False
 
     # -- engine / lights / hazards -------------------------------------------
     def _start_engine(self, t: Telemetry):
         if not t.ignition_on:
-            try:
-                self.bridge.set_button("Fake Ignition", "On")
-            except BridgeError:
-                pass
+            # ignition control differs per bus ('Fake Ignition' on the
+            # Scania) - find whatever THIS bus calls it
+            btn = t.button_like("Fake Ignition", "Ignition")
+            if btn is not None and "On" in (btn.get("States") or []):
+                try:
+                    self.bridge.set_button(btn["Name"], "On")
+                except BridgeError:
+                    pass
         try:
             self.bridge.hold("MotorStartStop", 0.4)
             self._say("engine start")
@@ -340,8 +374,20 @@ class Autopilot:
     def _auto_lights(self, t: Telemetry, now: float):
         if now < self._lights_pause_until:
             return
-        want = "Headlights" if t.is_night else "Off"
-        state = t.button_state("Light Switch")
+        btn = t.button_like("Light Switch", "Lightswitch", "Light")
+        states = (btn or {}).get("States") or []
+        if btn is None or len(states) < 2:
+            if not self._lights_warned:
+                self._lights_warned = True
+                self._say("this bus has no light switch telemetry - "
+                          "auto_lights idle")
+            return
+        # pick from THIS bus's own state list ('Headlights' when named,
+        # otherwise the strongest = last state; 'Off' or the first state)
+        on_state = "Headlights" if "Headlights" in states else states[-1]
+        off_state = "Off" if "Off" in states else states[0]
+        want = on_state if t.is_night else off_state
+        state = btn.get("State", "")
         if not state or state == want:
             self._lights_by_us = state or want
             return
@@ -352,7 +398,7 @@ class Autopilot:
             self._say("manual light switch - pausing auto_lights")
             return
         try:
-            self.bridge.set_button("Light Switch", want)
+            self.bridge.set_button(btn["Name"], want)
             self._lights_by_us = want
             self._say(f"lights {want.lower()}")
         except BridgeError:
@@ -394,9 +440,11 @@ class Autopilot:
 
         # departing: keep the indicator promise, otherwise normal driving
         if self._mode == "depart":
-            if now >= self._depart_until:
-                if self.features.auto_indicators:
-                    self._try_tap("SetIndicatorOff")
+            if now < self._depart_until:
+                if self._blinker_owned:
+                    self._signal(t, -1)   # pull out (right-hand traffic)
+            elif not self._blinker_owned or self._signal(t, 0):
+                self._blinker_owned = False
                 self._mode = "drive"
             self._speed_control(t)
             return True
@@ -409,9 +457,11 @@ class Autopilot:
             if (self.features.auto_indicators
                     and dist <= st.indicator_lead_m
                     and self._indicated_stop != stop_name
-                    and t.indicator == 0):
-                self._try_tap("SetIndicatorUp")   # curb side (right-hand traffic)
+                    and (t.indicator == 0 or self._blinker_owned)):
+                self._blinker_owned = True
                 self._indicated_stop = stop_name
+            if self._blinker_owned and self._indicated_stop == stop_name:
+                self._signal(t, 1)        # curb side (right-hand traffic)
             if dist <= st.stop_halt_m or (t.at_stop and t.speed_kmh < 5):
                 self._pedals(0.0, 0.6 if t.speed_kmh > 0.5 else 0.8)
                 if t.speed_kmh < 0.5:
@@ -432,21 +482,31 @@ class Autopilot:
         self._dwell_since = now
         self._pedals(0.0, 0.0)
         if self.features.auto_hold and not self._hold_by_us:
+            # not listed under Buttons Actions on every bus, but the
+            # event works game-wide (unknown events are simply ignored)
             self._try_tap("StopBrakeOnOff")
             self._hold_by_us = True
-        if self.features.auto_indicators:
-            self._try_tap("SetIndicatorOff")
         if self.features.auto_doors and not t.doors_open:
-            self._try_tap("DoorFrontOpenClose")
-            self._doors_by_us = ["DoorFrontOpenClose"]
-            if int(t.current_stop.get("DeboardingPeopleCount", 0) or 0) > 0:
-                self._try_tap("DoorMiddleOpenClose")
-                self._doors_by_us.append("DoorMiddleOpenClose")
+            # door events differ per bus (an 18m has a 4th door, a midi
+            # bus only two) - prefer the ones THIS bus lists, fall back
+            # to the front door event which every bus understands
+            from .catalog import DOOR_EVENTS
+            avail = ([e for e in DOOR_EVENTS if t.has_event(e)]
+                     or [DOOR_EVENTS[0]])
+            self._try_tap(avail[0])              # front door
+            self._doors_by_us = [avail[0]]
+            deboarding = int(
+                t.current_stop.get("DeboardingPeopleCount", 0) or 0)
+            if deboarding > 0 and len(avail) > 1:
+                self._try_tap(avail[1])          # middle door
+                self._doors_by_us.append(avail[1])
         self._say(f"serving stop: {stop_name or '(unnamed)'}")
 
     def _dwell(self, t: Telemetry, now: float):
         st = self.settings
         self._pedals(0.0, 0.0)  # hold brake carries the bus
+        if self._blinker_owned:
+            self._signal(t, 0)  # approach blinker off while we dwell
         if now - (self._dwell_since or now) < st.stop_min_dwell_s:
             return
         if t.boarding_pending > 0:
@@ -465,8 +525,8 @@ class Autopilot:
         if self._hold_by_us:
             self._try_tap("StopBrakeOnOff")
             self._hold_by_us = False
-        if self.features.auto_indicators:
-            self._try_tap("SetIndicatorDown")  # pull out (right-hand traffic)
+        # pull-out blinker: the depart branch drives it (vehicle-adaptive)
+        self._blinker_owned = self.features.auto_indicators
         self._depart_until = now + st.depart_indicator_s
         self._mode = "depart"
         self._say(f"departing {self._stopped_at or ''}".rstrip())

@@ -66,6 +66,10 @@ class MockGame:
             v["IndicatorState"] = -1
         elif event == "SetIndicatorOff":
             v["IndicatorState"] = 0
+        elif event == "IndicatorUp":    # stalk notch (MAN-style buses)
+            v["IndicatorState"] = min(1, int(v.get("IndicatorState", 0)) + 1)
+        elif event == "IndicatorDown":
+            v["IndicatorState"] = max(-1, int(v.get("IndicatorState", 0)) - 1)
         elif event == "MotorStartStop":
             pass  # engine start handled via press+release in tests
 

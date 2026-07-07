@@ -195,7 +195,10 @@ def main():
           ("DoorMiddleOpenClose", "push") in game.events)
     check("doors open in game", bridge.read().doors_open is True)
 
-    # boarding still pending: stay put
+    # first dwell tick cancels the approach blinker, then it stays quiet
+    tick(ap, bridge)
+    check("approach blinker off while dwelling",
+          bridge.read().indicator == 0)
     game.events.clear()
     tick(ap, bridge)
     check("waits while boarding", ap.mode == "dwell" and not game.events)
@@ -208,9 +211,10 @@ def main():
     game.events.clear()
     tick(ap, bridge)
     check("hold brake released", ("StopBrakeOnOff", "push") in game.events)
+    check("depart mode", ap.mode == "depart")
+    tick(ap, bridge)  # depart branch signals on the next tick
     check("left indicator to pull out",
           ("SetIndicatorDown", "push") in game.events)
-    check("depart mode", ap.mode == "depart")
     ap._depart_until = 0.0
     game.events.clear()
     v["IsAtStop"] = "false"
@@ -218,7 +222,42 @@ def main():
     tick(ap, bridge)
     check("indicator cancelled after pull-out",
           ("SetIndicatorOff", "push") in game.events)
+    tick(ap, bridge)  # telemetry confirms the cancel, mode returns
     check("back to drive", ap.mode == "drive")
+
+    print("vehicle adaptation - stalk-only bus (like the MAN DD):")
+    for b in v["Buttons"]:
+        if b["Name"] == "Indicator":
+            b["Actions"] = ["IndicatorDown", "IndicatorUp", "None"]
+    v["IndicatorState"] = 0
+    ap._indicated_stop = None
+    ap._blinker_owned = False
+    game.mission["NextStop"]["GeoLocation"] = [52.526791, 13.369500]  # ~49 m
+    v["Speed"] = 20.0
+    game.events.clear()
+    tick(ap, bridge)
+    check("falls back to the stalk event",
+          ("IndicatorUp", "push") in game.events
+          and ("SetIndicatorUp", "push") not in game.events)
+    check("stalk notched to the right", bridge.read().indicator == 1)
+    ap.disengage()
+    check("disengage cancels OUR blinker via the stalk",
+          bridge.read().indicator == 0)
+    check("ownership cleared", ap._blinker_owned is False)
+    # interrupted approach (stop moved away) also cleans up
+    ap._engaged = True
+    ap._mode = "drive"
+    ap._blinker_owned = True
+    v["IndicatorState"] = 1
+    game.mission["NextStop"]["GeoLocation"] = [52.6, 13.5]
+    tick(ap, bridge)
+    tick(ap, bridge)
+    check("interrupted approach: blinker taken back off",
+          bridge.read().indicator == 0 and ap._blinker_owned is False)
+    for b in v["Buttons"]:  # restore the Scania-style direct events
+        if b["Name"] == "Indicator":
+            b["Actions"] = ["SetIndicatorOff", "SetIndicatorDown",
+                            "SetIndicatorUp", "None"]
 
     print("auto lights:")
     ap.features.auto_lights = True
