@@ -80,7 +80,11 @@ class Settings:
     limiter_kmh: float = 60.0         # speed_limiter feature: hard cap
     stop_decel: float = 1.0           # m/s^2 comfort braking into stops
     stop_trigger_m: float = 250.0     # start shaping speed this far out
-    stop_halt_m: float = 8.0          # inside this: brake to a standstill
+    stop_pull_past_m: float = 12.0    # pull this far PAST the stop marker
+    #                                   (markers sit mid-bay; the bus should
+    #                                   halt at the END of the bus bay)
+    stop_creep_kmh: float = 7.0       # crawl speed while pulling forward
+    stop_final_brake_m: float = 2.0   # inside this: brake to a standstill
     stop_min_dwell_s: float = 4.0     # doors stay open at least this long
     hazard_brake_threshold: float = 0.9  # pedal jammed this far -> hazards
     hazard_duration_s: float = 5.0       # hazards back off after this
@@ -151,6 +155,8 @@ class Autopilot:
         self._lights_pause_until = 0.0
         self._indicated_stop = None   # StopName we already signaled for
         self._blinker_owned = False   # WE switched the indicator on
+        self._approach_stop = None    # StopName the min-dist tracker is for
+        self._stop_min_dist = None    # closest approach to the stop marker
         self._engine_was_on = False
         self._limiter_active = False
         self._stopped_at = None       # StopName we are currently serving
@@ -452,8 +458,16 @@ class Autopilot:
         if dist is None or not stop_name:
             return False
 
-        # approaching: indicate, shape speed as v = sqrt(2*a*d), halt inside
+        # approaching: indicate, then brake toward the END of the bus bay.
+        # The stop marker (GeoLocation) sits mid-bay, so the target point
+        # is stop_pull_past_m PAST it: the distance to the marker shrinks
+        # on approach and grows again once passed - the closest-approach
+        # tracker tells the two phases apart.
         if dist <= st.stop_trigger_m:
+            if self._approach_stop != stop_name:
+                self._approach_stop = stop_name
+                self._stop_min_dist = dist
+            self._stop_min_dist = min(self._stop_min_dist, dist)
             if (self.features.auto_indicators
                     and dist <= st.indicator_lead_m
                     and self._indicated_stop != stop_name
@@ -462,17 +476,28 @@ class Autopilot:
                 self._indicated_stop = stop_name
             if self._blinker_owned and self._indicated_stop == stop_name:
                 self._signal(t, 1)        # curb side (right-hand traffic)
-            if dist <= st.stop_halt_m or (t.at_stop and t.speed_kmh < 5):
+
+            passed = dist > self._stop_min_dist + 1.5
+            remaining = (st.stop_pull_past_m - dist if passed
+                         else st.stop_pull_past_m + dist)
+            # the bay ended sooner than pull_past: halt right where we are
+            zone_end = passed and not t.at_stop and t.speed_kmh < 15
+
+            if remaining <= st.stop_final_brake_m or zone_end:
                 self._pedals(0.0, 0.6 if t.speed_kmh > 0.5 else 0.8)
                 if t.speed_kmh < 0.5:
                     self._begin_dwell(t, now, stop_name)
                 else:
                     self._mode = "approach"
                 return True
-            v_cap_kmh = ((2 * st.stop_decel * max(0.0, dist - st.stop_halt_m))
-                         ** 0.5) * KMH
+            # comfort curve down to creep speed, crawl to the bay end
+            v_cap_kmh = max(
+                st.stop_creep_kmh,
+                ((2 * st.stop_decel
+                  * max(0.0, remaining - st.stop_final_brake_m)) ** 0.5)
+                * KMH)
             self._mode = "approach"
-            self._speed_control(t, cap_kmh=max(5.0, v_cap_kmh))
+            self._speed_control(t, cap_kmh=v_cap_kmh)
             return True
         return False
 

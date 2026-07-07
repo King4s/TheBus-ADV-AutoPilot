@@ -172,18 +172,27 @@ def main():
           ("SetIndicatorUp", "push") in game.events)
 
     # close enough that the comfort-braking curve dips under the limit
-    game.mission["NextStop"]["GeoLocation"] = [52.526791, 13.369334]
+    # (target = marker + stop_pull_past_m, so this is ~32 m to target)
+    game.mission["NextStop"]["GeoLocation"] = [52.526791, 13.369068]
     tick(ap, bridge)
     check("approach caps target below limit", ap.target_kmh < 30.0)
 
-    # rolling to a halt inside the stop zone
+    # ON the stop marker: do NOT stop mid-bay - creep on toward the end
     game.mission["NextStop"]["GeoLocation"] = [52.526791, 13.368773]
     game.mission["CurrentStop"]["BoardingPeopleCount"] = 2
     game.mission["CurrentStop"]["DeboardingPeopleCount"] = 1
     v["Speed"] = 3.0
     v["IsAtStop"] = "true"
     tick(ap, bridge)
-    check("braking to a halt", pad.brake > 0)
+    check("keeps rolling at the marker (mid-bay)",
+          ap.mode == "approach" and pad.brake == 0)
+    check("creep target toward the bay end",
+          ap.settings.stop_creep_kmh <= ap.target_kmh <= 20.0)
+
+    # marker now ~11 m behind us: that is the end of the bay - halt
+    game.mission["NextStop"]["GeoLocation"] = [52.526791, 13.368935]
+    tick(ap, bridge)
+    check("braking at the bay end", pad.brake > 0)
     v["Speed"] = 0.0
     game.events.clear()
     tick(ap, bridge)

@@ -71,7 +71,7 @@ behavior individually toggleable:
 |---|---|
 | `speed_control` | Follows the posted speed limit (`AllowedSpeed`, PI throttle via the virtual pad) |
 | `overspeed_brake` | Brakes when over target |
-| `stop_at_stops` | **Service stops**: shapes speed as `v = √(2·a·d)` toward the next timetable stop (distance = haversine of the stop's `GeoLocation` vs the player's) and halts inside the stop zone |
+| `stop_at_stops` | **Service stops**: shapes speed as `v = √(2·a·d)` toward the next timetable stop (distance = haversine of the stop's `GeoLocation` vs the player's). The marker sits mid-bay, so the bus **creeps past it (`stop_creep_kmh`) and halts at the end of the bus bay** — `stop_pull_past_m` (12 m) beyond the marker, detected via the closest-approach tracker; it also halts immediately if the stop zone ends sooner |
 | `auto_doors` | Opens the front door at the stop (middle door too when passengers deboard), closes when boarding/deboarding is done. Never closes a door a human opened; never pulls away through open doors |
 | `auto_hold` | Stop brake while dwelling at a stop, released on departure |
 | `auto_engine` | Ignition + engine start on engage (`MotorStartStop`) |
