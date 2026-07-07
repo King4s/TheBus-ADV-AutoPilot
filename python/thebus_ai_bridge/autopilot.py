@@ -59,7 +59,8 @@ FEATURE_LABELS = {
                      "timetable stop",
     "auto_doors": "Door cycle at stops (open for boarding, close when done)",
     "auto_hold": "Hold brake at stops (stop brake while dwelling)",
-    "auto_engine": "Ignition + engine start on engage",
+    "auto_engine": "Ignition + engine start on engage; releases the "
+                   "fixing brake to set off",
     "auto_lights": "Headlights by the game's own night flag",
     "auto_indicators": "Indicate into and out of bus stops",
     "auto_hazards": "Hazards on emergency braking (pedal floored)",
@@ -108,6 +109,9 @@ class Autopilot:
         self.autosave = autosave  # persist every toggle to the config file
         self._pad = pad           # injectable for tests; lazily created
         self._pad_failed = False
+        # a steering agent (ai_driver) may impose its own cap, e.g. for
+        # upcoming curves; None = no external cap
+        self.external_cap_kmh: float | None = None
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread = None
@@ -145,6 +149,7 @@ class Autopilot:
         self._holding = False         # driver_override yield
         self._brake_ticks = 0
         self._lights_by_us = None     # state we last commanded
+        self._fix_tap_at = 0.0        # last fixing-brake release attempt
         self._lights_pause_until = 0.0
         self._indicated_stop = None   # StopName we already signaled for
         self._engine_was_on = False
@@ -477,6 +482,9 @@ class Autopilot:
             target = min(target, cap_kmh)
         if self.features.speed_limiter:
             target = min(target, st.limiter_kmh)
+        cap = self.external_cap_kmh
+        if cap is not None:
+            target = min(target, cap)
         self._target_kmh = target
 
         if not self.features.speed_control and cap_kmh is None:
@@ -485,11 +493,18 @@ class Autopilot:
             self._pedals(0.0, 0.0)
             return
         if t.fixing_brake or (self._hold_by_us and self._mode == "drive"):
-            # never fight a parking brake; release the hold we own
+            # release the hold we own; release the fixing brake to set off
+            # (auto_engine, like the ETS2 bridge) - otherwise never fight it
             if self._hold_by_us:
                 self._try_tap("StopBrakeOnOff")
                 self._hold_by_us = False
             if t.fixing_brake:
+                now = time.monotonic()
+                if (self.features.auto_engine and target > 0
+                        and now - self._fix_tap_at > 2.0):
+                    self._fix_tap_at = now
+                    self._try_tap("FixingBrake")
+                    self._say("releasing the fixing brake")
                 self._pedals(0.0, 0.0)
                 return
         if t.gear_selector == "Neutral" and t.engine_on:

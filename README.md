@@ -18,10 +18,14 @@ The Bus (UE5, telemetry interface enabled)
                                        ▲
                 python: TheBusBridge ──┘   (zero-dependency core)
                 ├─ Autopilot      speed / service stops / doors / lights
+                ├─ AI driver      steering along the game's own nav route
+                │                 (pure pursuit on /roadmap + /route lanes)
                 ├─ GUI            feature toggles + live panel (tkinter)
+                ├─ Stream Deck    .sdPlugin with an AI DRIVE key (coexists
+                │                 with TML's official The Bus plugin)
                 ├─ TheBusEnv      gym-style step()/reset()
                 ├─ capture        PNG screenshots for vision agents
-                ├─ CLI            status | monitor | demo | gui | autopilot | mcp
+                ├─ CLI            status | monitor | demo | gui | autopilot | ai | mcp
                 └─ MCP server     14 tools so an LLM can drive
 ```
 
@@ -83,11 +87,9 @@ behavior individually toggleable:
 Built-in (no toggle): **switching the engine off disengages the
 autopilot** — ignition off means "we're done".
 
-What it deliberately does NOT do is **steer** — the telemetry interface
-has no analog inputs and the autopilot only touches throttle/brake.
-Lane keeping is on you, a vision agent, or the MCP client. (`/roadmap`
-does expose the map's full lane geometry if you want to build real lane
-following — see below.)
+What the autopilot deliberately does NOT do is **steer** — that is the
+**AI driver's** job (next section); on its own the autopilot leaves the
+wheel to you, a vision agent, or the MCP client.
 
 ```python
 from thebus_ai_bridge import TheBusBridge
@@ -100,6 +102,37 @@ with TheBusBridge() as bus:
 ```
 
 Headless: `python -m thebus_ai_bridge autopilot [--offset -5] [--max 50]`.
+
+## AI driver — the bus drives itself
+
+```
+python -m thebus_ai_bridge ai        # or the AI DRIVE key on a Stream Deck
+```
+
+`AiDriver` adds the missing piece: **steering**. The game's telemetry
+exposes the whole map's lane geometry (`/roadmap`, cubic hermite
+splines) and the lanes of the active navigation route (`/route`), so no
+vision is needed:
+
+1. The roadmap is loaded once (~15k lanes) and linked into a directed
+   lane graph (lane end → lane start adjacency).
+2. `/route`'s lane set is an **unordered map overlay**, so the drivable
+   sequence is rebuilt live: locate the lane under the bus (position +
+   heading alignment), then walk the graph forward, **preferring lanes
+   that belong to the route** — that choice is what takes the correct
+   arm of every junction.
+3. The resulting local path (~350 m ahead, rebuilt every 2 s) is
+   followed with pure-pursuit steering on the virtual pad, with a
+   curvature scan ahead that caps speed for corners
+   (`external_cap_kmh`), on top of everything the autopilot already does
+   (limits, service stops, doors, indicators).
+
+Modes: `follow` (on the route), `roam` (off route — follows the road,
+the game recalculates the route), `lost` (no plausible lane — steering
+released). **Set a destination/route in the game's navigation first**,
+engage, and mind the traffic: the telemetry has no traffic data, so
+`driver_override` (your brake) is the safety net — and the `pad` extra
+must be installed for steering to act.
 
 ### Configuration
 
@@ -122,6 +155,42 @@ ENGAGE/RELEASE, a checkbox per autopilot feature, manual buttons
 (doors 1–3, clearance, kneeling, indicators, warning lights, lights,
 wiper, engine, fixing/stop brake, gear R/N/D, horn-hold), a log, and a
 big red RELEASE CONTROL button.
+
+## Stream Deck
+
+`streamdeck_plugin\com.thebusaibridge.sdPlugin` runs inside the official
+Elgato app, so it works on all connected decks and **coexists with TML's
+own official The Bus plugin** (use theirs for cockpit switches, this one
+for the AI bridge). Actions:
+
+* **AI Driver (mount/dismount)** — THE key: one press mounts the AI on
+  the bus (autopilot + route steering), the key turns purple and shows
+  the live mode (`AI →42` following, `AI ROAM`, `AI LOST`); press again
+  to dismount and get your bus back.
+* **Autopilot (engage/release)** — longitudinal only, same semantics as
+  the GUI button (title shows the target, `DWELL`/`HOLD` while serving a
+  stop or yielding to your brake).
+* **Autopilot Feature** — toggle any single feature chosen in the key's
+  inspector (dropdown generated from `FEATURE_LABELS`).
+* **Bus Button** — tap or hold any of the ~60 cataloged events (grouped
+  dropdown: doors, signals, lights, driving, cabin, ticketing). Stateful
+  ones (doors, hazards, fixing brake, indicators, engine) light the key
+  green while active.
+* **Speed Display** — live speed plus limit/target; press toggles speed
+  control.
+
+Build & install:
+
+```
+powershell streamdeck_plugin\build.ps1     # launcher.exe + icons + assemble
+powershell streamdeck_plugin\install.ps1   # copy into the Elgato app, restart it
+```
+
+The app launches `thebuslauncher.exe` (tiny C++ shim) which runs
+`python -m thebus_ai_bridge.deck_plugin`; the interpreter path is pinned
+in `launcher.cfg`, diagnostics land in `deck_plugin.log`/`launcher.log`
+inside the installed plugin folder. Protocol test without the app or the
+game: `python python\tests\test_deck_plugin.py`.
 
 ## Python API
 
@@ -229,8 +298,10 @@ No build step — pure Python. Tests run against a **mock game server**
 (real HTTP, captured live JSON), no game needed:
 
 ```
-python python\tests\test_bridge.py      # 35-check client/protocol roundtrip
-python python\tests\test_autopilot.py   # 33-check autopilot behavior
+python python\tests\test_bridge.py       # 35-check client/protocol roundtrip
+python python\tests\test_autopilot.py    # 36-check autopilot behavior
+python python\tests\test_deck_plugin.py  # 21-check Stream Deck backend
+                                         # (mock Elgato app <-> real backend)
 ```
 
 `python/tests/data/` holds real captures from a live session (Scania

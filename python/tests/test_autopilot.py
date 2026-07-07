@@ -236,6 +236,18 @@ def main():
     check("manual switch pauses auto_lights",
           not game.buttons_set and ap._lights_pause_until > time.monotonic())
 
+    print("fixing brake release (auto_engine):")
+    ap.features.auto_engine = True
+    v["FixingBrake"] = "true"
+    game.events.clear()
+    tick(ap, bridge)
+    check("taps FixingBrake to set off",
+          ("FixingBrake", "push") in game.events)
+    check("no throttle while the brake is still on", pad.throttle == 0)
+    tick(ap, bridge)  # the mock released it on the tap
+    check("throttle after release", pad.throttle > 0)
+    ap.features.auto_engine = False
+
     print("disengage on engine off:")
     v["EngineStarted"] = "false"
     tick(ap, bridge)
