@@ -207,6 +207,18 @@ pad.neutral(); pad.close()                # release everything
   geo-referenced, so haversine distances against stop positions just work.
 * `Rotation.Yaw` is degrees, clockwise positive.
 
+**Buses differ — the bridge asks the vehicle.** Cockpit button names,
+event sets and lamp names vary per bus (the Scania Citywide has direct
+`SetIndicatorOff/Up/Down` events; the MAN Lion's City DD only has stalk
+notches `IndicatorUp/Down`; some lamps simply don't exist on some
+buses). The `Telemetry` capability helpers (`events`, `has_event()`,
+`button_like()`, `lamp_any()`) discover what the current bus supports,
+and `bridge.indicate(-1|0|+1)` drives the indicator correctly on any
+bus — the GUI keys, the Stream Deck actions and the autopilot all use
+this. Note `Buttons[].Actions` is not the complete event universe:
+events like `StopBrakeOnOff` work even on buses that don't list them,
+and unknown events are silently ignored, so sending them is safe.
+
 Event catalog: `python -m thebus_ai_bridge events`, or
 `thebus_ai_bridge/catalog.py` (doors, gear, brakes, indicators, lights,
 kneeling, wipers, A/C, ticketing/cash…). The authoritative per-bus list
