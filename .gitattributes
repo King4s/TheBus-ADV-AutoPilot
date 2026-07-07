@@ -1,0 +1,14 @@
+# Normalize all text files to LF in the repo and in the working tree
+# (Python, JSON, MD etc. are all LF-safe on Windows; this silences the
+# "LF will be replaced by CRLF" warnings once and for all).
+* text=auto eol=lf
+
+# Windows scripts want CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Binaries: never touch line endings
+*.png binary
+*.ico binary
+*.exe binary
+*.zip binary
