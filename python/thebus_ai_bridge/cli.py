@@ -1,4 +1,4 @@
-"""Command line: python -m thebus_ai_bridge {status|monitor|demo|gui|autopilot|ai|mcp|config|events}"""
+"""Command line: python -m thebus_ai_bridge {status|monitor|demo|gui|autopilot|mcp|config|events}"""
 from __future__ import annotations
 
 import argparse
@@ -111,34 +111,6 @@ def cmd_autopilot(args) -> int:
     return 0
 
 
-def cmd_ai(_args) -> int:
-    """Mount the AI: autopilot + steering along the navigation route."""
-    from .ai_driver import AiDriver
-    from .autopilot import Autopilot
-    bridge = TheBusBridge()
-    print("waiting for the game ...")
-    bridge.connect()
-    bridge.wait_in_vehicle()
-    ap = Autopilot.from_config(bridge)
-    ai = AiDriver(bridge, ap)
-    ai.start()
-    print("AI driver mounted (set a route in the game's navigation!) - "
-          "Ctrl+C dismounts")
-    try:
-        while True:
-            time.sleep(1.0)
-            s, a = ap.status(), ai.status()
-            print(f"\r{a['mode']:7} steer {a['steer']:+.2f}  "
-                  f"target {s['target_kmh']:5.1f} km/h  "
-                  f"path {a['path_m']:4d} m   ", end="", flush=True)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        ai.stop()
-        print("\ndismounted - the bus is yours again.")
-    return 0
-
-
 def cmd_mcp(_args) -> int:
     from .mcp_server import main as mcp_main
     mcp_main()
@@ -177,16 +149,13 @@ def main(argv=None) -> int:
     ap.add_argument("--offset", type=float, default=None,
                     help="km/h relative to the posted limit")
     ap.add_argument("--max", type=float, default=None, help="max km/h")
-    sub.add_parser("ai", help="mount the AI driver (autopilot + steering "
-                              "along the game's navigation route)")
     sub.add_parser("mcp", help="run the MCP server (stdio)")
     sub.add_parser("config", help="show the config file path and values")
     sub.add_parser("events", help="list known input events")
     args = p.parse_args(argv)
     return {"status": cmd_status, "monitor": cmd_monitor, "demo": cmd_demo,
-            "gui": cmd_gui, "autopilot": cmd_autopilot, "ai": cmd_ai,
-            "mcp": cmd_mcp, "config": cmd_config,
-            "events": cmd_events}[args.cmd](args)
+            "gui": cmd_gui, "autopilot": cmd_autopilot, "mcp": cmd_mcp,
+            "config": cmd_config, "events": cmd_events}[args.cmd](args)
 
 
 if __name__ == "__main__":

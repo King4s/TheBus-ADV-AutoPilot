@@ -2,7 +2,7 @@
   "SDKVersion": 2,
   "Author": "The Bus AI Connector",
   "Name": "The Bus AI Bridge",
-  "Description": "Drive The Bus (TML-Studios) from your Stream Deck: AI driver (mounts an AI on the bus), autopilot engage/release, feature toggles, any bus event, live speed display. Needs the game's telemetry interface enabled.",
+  "Description": "Drive The Bus (TML-Studios) from your Stream Deck: autopilot engage/release, feature toggles, any bus event, live speed display. Needs the game's telemetry interface enabled.",
   "URL": "https://github.com/",
   "Icon": "images/plugin",
   "Category": "The Bus AI Bridge",
@@ -14,17 +14,6 @@
   ],
   "Software": { "MinimumVersion": "6.5" },
   "Actions": [
-    {
-      "UUID": "com.thebusaibridge.aidriver",
-      "Name": "AI Driver (mount/dismount)",
-      "Tooltip": "One key mounts an AI on the bus: autopilot for speed, service stops and doors PLUS steering along the game's own navigation route. Press again to dismount.",
-      "Icon": "images/aidriver_action",
-      "DisableAutomaticStates": true,
-      "States": [
-        { "Image": "images/ai_off", "TitleAlignment": "top" },
-        { "Image": "images/ai_on", "TitleAlignment": "top" }
-      ]
-    },
     {
       "UUID": "com.thebusaibridge.autopilot",
       "Name": "Autopilot (engage/release)",

@@ -10,7 +10,6 @@ OUT = Path(__file__).resolve().parents[1] / "streamdeck_plugin" / "images"
 
 DARK, DIM, WHITE = "#101218", "#9aa0aa", "#e8e8e8"
 GREEN, BLUE, YELLOW, RED = "#1f6f33", "#1f4d8a", "#8a6d1f", "#8a1f1f"
-PURPLE = "#5a2f8a"
 
 
 def font(size: int):
@@ -60,8 +59,6 @@ def action_icon(name: str, text: str):
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     # key states
-    asset("ai_off", "AI\nDRIVE", DARK, WHITE, PURPLE)
-    asset("ai_on", "AI", PURPLE, WHITE)
     asset("ap_off", "ENGAGE", DARK, WHITE, GREEN)
     asset("ap_on", "RELEASE", RED, WHITE)
     asset("feat_off", "", DARK, DIM)
@@ -70,7 +67,6 @@ def main():
     asset("button_on", "", GREEN, WHITE)
     asset("speed", "", DARK, WHITE, BLUE)
     # action-list + plugin icons
-    action_icon("aidriver_action", "AI")
     action_icon("autopilot_action", "AP")
     action_icon("feature_action", "⚙")
     action_icon("button_action", "⏻")

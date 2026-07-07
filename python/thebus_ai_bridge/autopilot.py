@@ -109,9 +109,6 @@ class Autopilot:
         self.autosave = autosave  # persist every toggle to the config file
         self._pad = pad           # injectable for tests; lazily created
         self._pad_failed = False
-        # a steering agent (ai_driver) may impose its own cap, e.g. for
-        # upcoming curves; None = no external cap
-        self.external_cap_kmh: float | None = None
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread = None
@@ -482,9 +479,6 @@ class Autopilot:
             target = min(target, cap_kmh)
         if self.features.speed_limiter:
             target = min(target, st.limiter_kmh)
-        cap = self.external_cap_kmh
-        if cap is not None:
-            target = min(target, cap)
         self._target_kmh = target
 
         if not self.features.speed_control and cap_kmh is None:

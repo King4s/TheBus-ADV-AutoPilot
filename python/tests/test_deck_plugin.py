@@ -7,7 +7,7 @@ mock Stream Deck app (websocket server, this file)
 Verifies the SDK protocol (register, willAppear, keyDown, setTitle/
 setState) AND that key presses actually reach the bus: the autopilot key
 engages (throttle on the fake pad), the busbutton key fires its event at
-the mock game, the AI key mounts and dismounts the AI driver.
+the mock game.
 
 Run:  python python\tests\test_deck_plugin.py
 """
@@ -108,7 +108,6 @@ async def run_mock_app(game: MockGame, plugin_ready: threading.Event,
     # place one instance of each action
     await send("willAppear", "autopilot", "c_ap",
                settings={})
-    await send("willAppear", "aidriver", "c_ai", settings={})
     await send("willAppear", "feature", "c_feat",
                settings={"feature": "auto_doors"})
     await send("willAppear", "busbutton", "c_door",
@@ -165,22 +164,6 @@ async def run_mock_app(game: MockGame, plugin_ready: threading.Event,
     await send("keyUp", ctx="c_horn")
     await settle(0.3)
     check("hold key -> release", ("Horn", "release") in game.events)
-
-    print("AI driver key:")
-    received.clear()
-    await key("c_ai")
-    await settle(1.5)
-    check("AI mounted", plugin.ai.active)
-    check("autopilot engaged with it", plugin.ap.engaged)
-    check("AI key state -> 1",
-          any(m["payload"]["state"] == 1 for m in of("setState", "c_ai")))
-    check("AI title shows mode",
-          any(m["payload"]["title"].startswith("AI")
-              for m in of("setTitle", "c_ai")))
-    await key("c_ai")
-    await settle(0.5)
-    check("AI dismounted", not plugin.ai.active)
-    check("autopilot released with it", not plugin.ap.engaged)
 
     plugin.ws.close()
     server.close()

@@ -11,9 +11,6 @@ which execs:  python -m thebus_ai_bridge.deck_plugin -port .. -pluginUUID ..
 
 Actions (UUIDs under com.thebusaibridge.*):
   autopilot   one key = engage AND release; shows target speed / DWELL / HOLD
-  aidriver    THE AI KEY: mounts the AI on the bus - autopilot for speed,
-              stops and doors PLUS pure-pursuit steering along the game's
-              own navigation route. Press again to dismount.
   feature     toggle one autopilot feature (dropdown in the inspector)
   busbutton   fire any input event, tap or hold (grouped dropdown);
               stateful ones (doors, hazards, parking brake, indicators,
@@ -31,8 +28,7 @@ from pathlib import Path
 
 import websocket  # websocket-client
 
-from . import catalog
-from .ai_driver import AiDriver
+from . import catalog  # noqa: F401  (imported for the PI generators)
 from .autopilot import Autopilot
 from .bridge import BridgeError, TheBusBridge
 
@@ -93,7 +89,6 @@ class Plugin:
         self.bridge = TheBusBridge()
         self.ap = Autopilot.from_config(self.bridge)
         self.ap.start()
-        self.ai = AiDriver(self.bridge, self.ap)
         self.contexts = {}   # context -> {action, settings, user_title, shown}
         self._send_lock = threading.Lock()
         self.ws = websocket.WebSocketApp(
@@ -106,7 +101,6 @@ class Plugin:
         threading.Thread(target=self._update_loop, daemon=True,
                          name="thebus-sd-update").start()
         self.ws.run_forever()          # returns when the app closes us
-        self.ai.stop()
         self.ap.stop()
 
     def send(self, event: str, context: str | None = None, **payload):
@@ -159,17 +153,10 @@ class Plugin:
         action, settings = info["action"], info["settings"]
         try:
             if action == "autopilot" and down:
-                if self.ai.active:          # AP release also dismounts the AI
-                    self.ai.stop()
-                elif self.ap.engaged:
+                if self.ap.engaged:
                     self.ap.disengage()
                 else:
                     self.ap.engage()
-            elif action == "aidriver" and down:
-                if self.ai.active:
-                    self.ai.stop()          # dismount, hand everything back
-                else:
-                    self.ai.start()         # mount: autopilot + steering
             elif action == "feature" and down:
                 name = settings.get("feature", "speed_control")
                 self.ap.set_feature(
@@ -233,17 +220,6 @@ class Plugin:
                 title = mode.upper()
             else:
                 title = f"→{st['target_kmh']:.0f}"
-            return title, 1
-
-        if action == "aidriver":
-            ai = self.ai.status()
-            if not ai["active"]:
-                return "", 0
-            mode = ai["mode"].upper()
-            if mode == "FOLLOW":
-                title = f"AI\n→{st['target_kmh']:.0f}"
-            else:
-                title = f"AI\n{mode}"
             return title, 1
 
         if action == "feature":

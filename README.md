@@ -18,14 +18,12 @@ The Bus (UE5, telemetry interface enabled)
                                        ▲
                 python: TheBusBridge ──┘   (zero-dependency core)
                 ├─ Autopilot      speed / service stops / doors / lights
-                ├─ AI driver      steering along the game's own nav route
-                │                 (pure pursuit on /roadmap + /route lanes)
                 ├─ GUI            feature toggles + live panel (tkinter)
-                ├─ Stream Deck    .sdPlugin with an AI DRIVE key (coexists
-                │                 with TML's official The Bus plugin)
+                ├─ Stream Deck    .sdPlugin (coexists with TML's official
+                │                 The Bus plugin)
                 ├─ TheBusEnv      gym-style step()/reset()
                 ├─ capture        PNG screenshots for vision agents
-                ├─ CLI            status | monitor | demo | gui | autopilot | ai | mcp
+                ├─ CLI            status | monitor | demo | gui | autopilot | mcp
                 └─ MCP server     14 tools so an LLM can drive
 ```
 
@@ -87,9 +85,10 @@ behavior individually toggleable:
 Built-in (no toggle): **switching the engine off disengages the
 autopilot** — ignition off means "we're done".
 
-What the autopilot deliberately does NOT do is **steer** — that is the
-**AI driver's** job (next section); on its own the autopilot leaves the
-wheel to you, a vision agent, or the MCP client.
+What the autopilot deliberately does NOT do is **steer** — the wheel
+stays with you, a vision agent, or the MCP client. (`/roadmap` does
+expose the map's full lane geometry if you ever want to build lane
+following on top.)
 
 ```python
 from thebus_ai_bridge import TheBusBridge
@@ -102,37 +101,6 @@ with TheBusBridge() as bus:
 ```
 
 Headless: `python -m thebus_ai_bridge autopilot [--offset -5] [--max 50]`.
-
-## AI driver — the bus drives itself
-
-```
-python -m thebus_ai_bridge ai        # or the AI DRIVE key on a Stream Deck
-```
-
-`AiDriver` adds the missing piece: **steering**. The game's telemetry
-exposes the whole map's lane geometry (`/roadmap`, cubic hermite
-splines) and the lanes of the active navigation route (`/route`), so no
-vision is needed:
-
-1. The roadmap is loaded once (~15k lanes) and linked into a directed
-   lane graph (lane end → lane start adjacency).
-2. `/route`'s lane set is an **unordered map overlay**, so the drivable
-   sequence is rebuilt live: locate the lane under the bus (position +
-   heading alignment), then walk the graph forward, **preferring lanes
-   that belong to the route** — that choice is what takes the correct
-   arm of every junction.
-3. The resulting local path (~350 m ahead, rebuilt every 2 s) is
-   followed with pure-pursuit steering on the virtual pad, with a
-   curvature scan ahead that caps speed for corners
-   (`external_cap_kmh`), on top of everything the autopilot already does
-   (limits, service stops, doors, indicators).
-
-Modes: `follow` (on the route), `roam` (off route — follows the road,
-the game recalculates the route), `lost` (no plausible lane — steering
-released). **Set a destination/route in the game's navigation first**,
-engage, and mind the traffic: the telemetry has no traffic data, so
-`driver_override` (your brake) is the safety net — and the `pad` extra
-must be installed for steering to act.
 
 ### Configuration
 
@@ -163,11 +131,7 @@ Elgato app, so it works on all connected decks and **coexists with TML's
 own official The Bus plugin** (use theirs for cockpit switches, this one
 for the AI bridge). Actions:
 
-* **AI Driver (mount/dismount)** — THE key: one press mounts the AI on
-  the bus (autopilot + route steering), the key turns purple and shows
-  the live mode (`AI →42` following, `AI ROAM`, `AI LOST`); press again
-  to dismount and get your bus back.
-* **Autopilot (engage/release)** — longitudinal only, same semantics as
+* **Autopilot (engage/release)** — one key for both, same semantics as
   the GUI button (title shows the target, `DWELL`/`HOLD` while serving a
   stop or yielding to your brake).
 * **Autopilot Feature** — toggle any single feature chosen in the key's
