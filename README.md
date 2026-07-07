@@ -187,6 +187,26 @@ in `launcher.cfg`, diagnostics land in `deck_plugin.log`/`launcher.log`
 inside the installed plugin folder. Protocol test without the app or the
 game: `python python\tests\test_deck_plugin.py`.
 
+## Start with the game from Steam
+
+Steam has no plugin system, but its **Launch Options** can wrap the game
+command — so the bridge starts and stops WITH the game:
+
+1. Build once: `powershell tools\build_app.ps1` → produces
+   `dist\TheBus Copilot.exe` (the GUI as a single exe, no Python needed)
+   and `dist\TheBusSteamCompanion.exe` (the wrapper).
+2. Steam → The Bus → **Properties… → Launch Options**:
+
+   ```
+   "C:\thebus-ai-connector\dist\TheBusSteamCompanion.exe" %command%
+   ```
+
+Every launch of The Bus from Steam now also opens the Copilot (skipped
+if one is already running), and closing the game closes it again
+(clean `WM_CLOSE` first; a kill-on-close job object reaps stragglers —
+and the pad watchdog neutralizes controls in any case). Diagnostics:
+`dist\companion.log`.
+
 ## Python API
 
 ```python
