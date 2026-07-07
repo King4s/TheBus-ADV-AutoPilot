@@ -225,6 +225,16 @@ class Autopilot:
         if self.autosave:
             self.save_config()
 
+    def update_settings(self, **kw):
+        """Change settings values (thread-safe; persisted with autosave)."""
+        with self._lock:
+            for k, v in kw.items():
+                if not hasattr(self.settings, k):
+                    raise KeyError(k)
+                setattr(self.settings, k, type(getattr(self.settings, k))(v))
+        if self.autosave:
+            self.save_config()
+
     def _say(self, msg: str):
         line = f"{time.strftime('%H:%M:%S')} {msg}"
         self.log.append(line)

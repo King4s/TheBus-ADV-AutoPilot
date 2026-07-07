@@ -71,6 +71,8 @@ def main():
     action_icon("feature_action", "⚙")
     action_icon("button_action", "⏻")
     action_icon("speed_action", "km")
+    action_icon("wiper_action", "☂")
+    action_icon("ac_action", "❄")
     action_icon("category", "🚌")
     icon("plugin", 72, "🚌")
     icon("plugin@2x", 144, "🚌")

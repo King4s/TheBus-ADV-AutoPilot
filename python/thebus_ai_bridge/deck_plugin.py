@@ -16,6 +16,18 @@ Actions (UUIDs under com.thebusaibridge.*):
               stateful ones (doors, hazards, parking brake, indicators,
               engine) light the key up while active
   speed       live speed/limit display; press toggles speed control
+  offsetdial  DIAL (GALLEON 100 SD / SD+): rotate = speed-limit offset
+              +/- 1 km/h (persisted), press or touch = reset to 0
+  limiterdial DIAL: rotate = hard-limiter cap +/- 1 km/h (persisted),
+              press or touch = limiter on/off
+  wiperdial   DIAL: rotate = wiper faster/slower, press = wipers off;
+              LCD shows the live wiper state
+  acdial      DIAL: rotate = A/C temperature, press = fan intensity step;
+              LCD shows the set temperature and fan level
+  drivedial   DIAL with two functions on ONE dial: A = limit offset,
+              B = limiter cap. LONG-press (>= 0.5 s) switches A/B, short
+              press = reset offset (A) / limiter on-off (B). The mode
+              persists per key.
 """
 from __future__ import annotations
 
@@ -145,6 +157,13 @@ class Plugin:
                     threading.Thread(
                         target=self._key, daemon=True,
                         args=(ctx, info, event == "keyDown")).start()
+            elif event in ("dialRotate", "dialDown", "dialUp", "touchTap"):
+                info = self.contexts.get(ctx)
+                if info:
+                    ticks = payload.get("ticks", 0)
+                    threading.Thread(
+                        target=self._dial, daemon=True,
+                        args=(ctx, info, event, ticks)).start()
         except Exception:
             log.exception("bad message: %.200s", raw)
 
@@ -170,6 +189,86 @@ class Plugin:
             log.warning("%s: %s", action, e)
             self.send("showAlert", ctx)
 
+    LONG_PRESS_S = 0.5
+
+    def _set_offset(self, value: float):
+        self.ap.update_settings(
+            speed_offset_kmh=max(-25.0, min(25.0, value)))
+
+    def _toggle_limiter(self):
+        self.ap.set_feature(
+            "speed_limiter", not self.ap.features.speed_limiter)
+
+    def _dial(self, ctx: str, info: dict, event: str, ticks: int):
+        """GALLEON 100 SD / Stream Deck + rotary dials."""
+        action = info["action"]
+        try:
+            if action == "offsetdial":
+                if event == "dialRotate":
+                    self._set_offset(
+                        self.ap.settings.speed_offset_kmh + ticks)
+                elif event in ("dialUp", "touchTap"):
+                    self._set_offset(0.0)  # back to the posted limit
+            elif action == "limiterdial":
+                if event == "dialRotate":
+                    self.ap.update_settings(limiter_kmh=max(20.0, min(
+                        90.0, self.ap.settings.limiter_kmh + ticks)))
+                elif event in ("dialUp", "touchTap"):
+                    self._toggle_limiter()
+            elif action == "wiperdial":
+                if event == "dialRotate":
+                    name = "WiperUp" if ticks > 0 else "WiperDown"
+                    for _ in range(min(abs(ticks), 3)):
+                        self.bridge.tap(name)
+                elif event in ("dialUp", "touchTap"):
+                    self.bridge.set_button("Wiper", "Off")
+            elif action == "acdial":
+                if event == "dialRotate":
+                    name = ("AirconditionKeyUp" if ticks > 0
+                            else "AirconditionKeyDown")
+                    for _ in range(min(abs(ticks), 5)):
+                        self.bridge.tap(name)
+                elif event in ("dialUp", "touchTap"):
+                    self.bridge.tap("ACIntensity")  # fan step
+            elif action == "drivedial":
+                self._drive_dial(ctx, info, event, ticks)
+        except (BridgeError, KeyError) as e:
+            log.warning("%s: %s", action, e)
+            self.send("showAlert", ctx)
+
+    def _drive_dial(self, ctx: str, info: dict, event: str, ticks: int):
+        """One dial, two functions: A = limit offset, B = limiter cap.
+        A LONG dial press switches between them (persisted as a setting);
+        a short press is the mode's primary action."""
+        mode = info["settings"].get("mode", "A")
+
+        if event == "dialDown":
+            info["pressed_at"] = time.monotonic()
+            return
+        if event == "dialUp":
+            held = time.monotonic() - info.get("pressed_at", 0.0)
+            if held >= self.LONG_PRESS_S:
+                info["settings"]["mode"] = "B" if mode == "A" else "A"
+                self.send("setSettings", ctx, **info["settings"])
+                info["shown"] = None  # repaint the LCD with the new mode
+                return
+            if mode == "A":
+                self._set_offset(0.0)
+            else:
+                self._toggle_limiter()
+            return
+        if event == "dialRotate":
+            if mode == "A":
+                self._set_offset(self.ap.settings.speed_offset_kmh + ticks)
+            else:
+                self.ap.update_settings(limiter_kmh=max(20.0, min(
+                    90.0, self.ap.settings.limiter_kmh + ticks)))
+        elif event == "touchTap":
+            if mode == "A":
+                self._set_offset(0.0)
+            else:
+                self._toggle_limiter()
+
     def _bus_button(self, settings: dict, down: bool):
         event = settings.get("event", "Horn")
         if bool(settings.get("hold")):      # hold while the key is down
@@ -189,6 +288,17 @@ class Plugin:
                 t = None
             st = self.ap.status()
             for ctx, info in list(self.contexts.items()):
+                if info["action"] in ("offsetdial", "limiterdial",
+                                      "wiperdial", "acdial", "drivedial"):
+                    fb = self._render_dial(info, t, st)
+                    if info["shown"] != fb:
+                        info["shown"] = fb
+                        try:
+                            self.send("setFeedback", ctx, **fb)
+                        except Exception:
+                            info["shown"] = None
+                            break
+                    continue
                 try:
                     title, state = self._render(info, t, st)
                 except Exception:
@@ -247,6 +357,44 @@ class Plugin:
                      else (f"\nlim {lim:.0f}" if lim > 1 else ""))
             return f"{t.speed_kmh:.0f}{line2}", None
         return None, None
+
+    def _render_dial(self, info: dict, t, st: dict) -> dict:
+        """setFeedback payload {title, value} for one dial instance."""
+        action = info["action"]
+        offset_kmh = self.ap.settings.speed_offset_kmh
+        value = f"{offset_kmh:+.0f} km/h"
+        if st["engaged"]:
+            value += f"  →{st['target_kmh']:.0f}"
+        offset = {"title": "LIMIT OFFSET", "value": value}
+
+        lim = self.ap.settings.limiter_kmh
+        if st["features"].get("speed_limiter", False):
+            limiter = {"title": "LIMITER", "value": f"≤{lim:.0f} km/h"}
+        else:
+            limiter = {"title": "LIMITER", "value": f"off · {lim:.0f}"}
+
+        if action == "offsetdial":
+            return offset
+        if action == "limiterdial":
+            return limiter
+        if action == "wiperdial":
+            state = t.button_state("Wiper") if t is not None else ""
+            return {"title": "WIPER", "value": state or "--"}
+        if action == "acdial":
+            if t is None:
+                return {"title": "A/C", "value": "--"}
+            temp = t.button_state("Air Condition Temperature")
+            fan = t.button_state("Air Condition")
+            try:
+                temp = f"{int(temp) / 10:.1f}°"
+            except (TypeError, ValueError):
+                temp = temp or "--"
+            return {"title": "A/C", "value": f"{temp}  fan {fan or '--'}"}
+        # drivedial: prefix with the active mode (long-press switches)
+        mode = info["settings"].get("mode", "A")
+        fb = dict(offset if mode == "A" else limiter)
+        fb["title"] = f"{mode} · {fb['title']}"
+        return fb
 
 
 def main(argv=None) -> int:

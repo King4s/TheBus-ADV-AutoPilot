@@ -58,6 +58,86 @@
       "States": [
         { "Image": "images/speed" }
       ]
+    },
+    {
+      "UUID": "com.thebusaibridge.offsetdial",
+      "Name": "Speed Offset (dial)",
+      "Tooltip": "Rotate to drive above/below the posted limit (+/- 1 km/h per tick, persisted), press or touch to reset to the limit. For GALLEON 100 SD / Stream Deck + dials.",
+      "Icon": "images/speed_action",
+      "Controllers": [ "Encoder" ],
+      "Encoder": {
+        "layout": "$B1",
+        "TriggerDescription": {
+          "Rotate": "Limit offset +/- 1 km/h",
+          "Push": "Reset to the posted limit",
+          "Touch": "Reset to the posted limit"
+        }
+      },
+      "States": [ { "Image": "images/speed" } ]
+    },
+    {
+      "UUID": "com.thebusaibridge.limiterdial",
+      "Name": "Speed Limiter (dial)",
+      "Tooltip": "Rotate to set the hard limiter's cap (20-90 km/h, persisted), press or touch to switch the limiter on/off.",
+      "Icon": "images/speed_action",
+      "Controllers": [ "Encoder" ],
+      "Encoder": {
+        "layout": "$B1",
+        "TriggerDescription": {
+          "Rotate": "Limiter cap +/- 1 km/h",
+          "Push": "Limiter on/off",
+          "Touch": "Limiter on/off"
+        }
+      },
+      "States": [ { "Image": "images/speed" } ]
+    },
+    {
+      "UUID": "com.thebusaibridge.wiperdial",
+      "Name": "Wiper (dial)",
+      "Tooltip": "Rotate for faster/slower wipers (Off, Interval, On, Fast), press to switch them off. The LCD shows the live wiper state.",
+      "Icon": "images/wiper_action",
+      "Controllers": [ "Encoder" ],
+      "Encoder": {
+        "layout": "$B1",
+        "TriggerDescription": {
+          "Rotate": "Wiper faster / slower",
+          "Push": "Wipers off",
+          "Touch": "Wipers off"
+        }
+      },
+      "States": [ { "Image": "images/button" } ]
+    },
+    {
+      "UUID": "com.thebusaibridge.acdial",
+      "Name": "A/C (dial)",
+      "Tooltip": "Rotate to set the air-condition temperature, press for the next fan intensity. The LCD shows the set temperature and fan level.",
+      "Icon": "images/ac_action",
+      "Controllers": [ "Encoder" ],
+      "Encoder": {
+        "layout": "$B1",
+        "TriggerDescription": {
+          "Rotate": "Temperature +/-",
+          "Push": "Fan intensity step",
+          "Touch": "Fan intensity step"
+        }
+      },
+      "States": [ { "Image": "images/button" } ]
+    },
+    {
+      "UUID": "com.thebusaibridge.drivedial",
+      "Name": "Drive Dial A/B",
+      "Tooltip": "Two functions on one dial: A = speed-limit offset, B = limiter cap. LONG-press the dial to switch between A and B; short press resets the offset (A) or toggles the limiter (B).",
+      "Icon": "images/speed_action",
+      "Controllers": [ "Encoder" ],
+      "Encoder": {
+        "layout": "$B1",
+        "TriggerDescription": {
+          "Rotate": "A: limit offset / B: limiter cap",
+          "Push": "Short: reset / limiter on-off · LONG: switch A-B",
+          "Touch": "A: reset offset / B: limiter on-off"
+        }
+      },
+      "States": [ { "Image": "images/speed" } ]
     }
   ]
 }

@@ -143,6 +143,22 @@ for the AI bridge). Actions:
 * **Speed Display** — live speed plus limit/target; press toggles speed
   control.
 
+Dial actions (GALLEON 100 SD, Stream Deck +; the LCD shows live values):
+
+* **Speed Offset (dial)** — rotate = drive ±1 km/h around the posted
+  limit (persisted), press/touch = back to the limit.
+* **Speed Limiter (dial)** — rotate = the hard cap (20–90 km/h,
+  persisted), press/touch = limiter on/off; LCD shows `≤60 km/h` armed
+  or `off · 60`.
+* **Wiper (dial)** — rotate = Off/Interval/On/Fast, press = off; LCD
+  mirrors the live wiper state from telemetry.
+* **A/C (dial)** — rotate = temperature, press = next fan intensity;
+  LCD shows `22.0°  fan 2`.
+* **Drive Dial A/B** — two functions on ONE dial: **A** = limit offset,
+  **B** = limiter cap. **Long-press switches A↔B** (LCD shows
+  `A · LIMIT OFFSET` / `B · LIMITER`), short press = reset offset (A) /
+  limiter on-off (B).
+
 Build & install:
 
 ```
@@ -264,8 +280,9 @@ No build step — pure Python. Tests run against a **mock game server**
 ```
 python python\tests\test_bridge.py       # 35-check client/protocol roundtrip
 python python\tests\test_autopilot.py    # 36-check autopilot behavior
-python python\tests\test_deck_plugin.py  # 21-check Stream Deck backend
-                                         # (mock Elgato app <-> real backend)
+python python\tests\test_deck_plugin.py  # 29-check Stream Deck backend
+                                         # (mock Elgato app <-> real backend,
+                                         #  keys + dials)
 ```
 
 `python/tests/data/` holds real captures from a live session (Scania

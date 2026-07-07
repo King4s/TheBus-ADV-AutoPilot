@@ -165,6 +165,77 @@ async def run_mock_app(game: MockGame, plugin_ready: threading.Event,
     await settle(0.3)
     check("hold key -> release", ("Horn", "release") in game.events)
 
+    print("dials:")
+    await send("willAppear", "offsetdial", "c_off", settings={})
+    await send("willAppear", "limiterdial", "c_lim", settings={})
+    await send("willAppear", "wiperdial", "c_wip", settings={})
+    await send("willAppear", "acdial", "c_ac", settings={})
+    await send("willAppear", "drivedial", "c_dd", settings={})
+    await settle()
+    check("offset dial LCD feedback",
+          any(m["payload"].get("title") == "LIMIT OFFSET"
+              for m in of("setFeedback", "c_off")))
+    check("wiper dial LCD shows live state",
+          any(m["payload"].get("value") == "Off"
+              for m in of("setFeedback", "c_wip")))
+
+    await send("dialRotate", ctx="c_off", ticks=3)
+    await settle(0.3)
+    check("offset rotate +3", plugin.ap.settings.speed_offset_kmh == 3.0)
+    check("offset persisted",
+          json.loads(Path(os.environ["THEBUS_AI_BRIDGE_CONFIG"])
+                     .read_text())["settings"]["speed_offset_kmh"] == 3.0)
+    await send("dialUp", ctx="c_off")
+    await settle(0.3)
+    check("offset press resets to 0",
+          plugin.ap.settings.speed_offset_kmh == 0.0)
+
+    lim0 = plugin.ap.settings.limiter_kmh
+    await send("dialRotate", ctx="c_lim", ticks=-5)
+    await settle(0.3)
+    check("limiter rotate -5", plugin.ap.settings.limiter_kmh == lim0 - 5)
+    was_lim = plugin.ap.features.speed_limiter
+    await send("dialUp", ctx="c_lim")
+    await settle(0.3)
+    check("limiter press toggles the limiter",
+          plugin.ap.features.speed_limiter is (not was_lim))
+
+    game.events.clear()
+    await send("dialRotate", ctx="c_wip", ticks=2)
+    await settle(0.3)
+    check("wiper rotate -> WiperUp x2",
+          game.events.count(("WiperUp", "push")) == 2)
+    game.buttons_set.clear()
+    await send("dialUp", ctx="c_wip")
+    await settle(0.3)
+    check("wiper press -> Wiper Off",
+          ("Wiper", "Off") in game.buttons_set)
+
+    game.events.clear()
+    await send("dialRotate", ctx="c_ac", ticks=-1)
+    await send("dialUp", ctx="c_ac")
+    await settle(0.3)
+    check("A/C rotate -> temperature down",
+          ("AirconditionKeyDown", "push") in game.events)
+    check("A/C press -> fan step", ("ACIntensity", "push") in game.events)
+
+    received.clear()
+    await send("dialDown", ctx="c_dd")
+    await asyncio.sleep(0.7)                 # hold long
+    await send("dialUp", ctx="c_dd")
+    await settle(0.3)
+    check("drive dial long-press switches to B",
+          any(m["payload"].get("mode") == "B"
+              for m in of("setSettings", "c_dd")))
+    lim1 = plugin.ap.settings.limiter_kmh
+    await send("dialRotate", ctx="c_dd", ticks=2)
+    await settle(0.3)
+    check("drive dial B rotates the limiter cap",
+          plugin.ap.settings.limiter_kmh == lim1 + 2)
+    check("drive dial LCD shows the B mode",
+          any(str(m["payload"].get("title", "")).startswith("B ·")
+              for m in of("setFeedback", "c_dd")))
+
     plugin.ws.close()
     server.close()
     await server.wait_closed()
