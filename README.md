@@ -115,14 +115,29 @@ The GUI, the autopilot CLI and the MCP server all load it on start and
 save every change back. Unknown keys are ignored and broken values fall
 back to defaults, so hand-editing is safe.
 
-## GUI
+## GUI (no Stream Deck needed)
 
 `python -m thebus_ai_bridge gui` — dark-mode control panel: live
 telemetry (speed, limit, gear, doors, next stop + distance),
-ENGAGE/RELEASE, a checkbox per autopilot feature, manual buttons
+ENGAGE/RELEASE, a checkbox per autopilot feature, spinners for limit
+offset / max speed / limiter cap / bay pull-past, manual buttons
 (doors 1–3, clearance, kneeling, indicators, warning lights, lights,
 wiper, engine, fixing/stop brake, gear R/N/D, horn-hold), a log, and a
 big red RELEASE CONTROL button.
+
+Usable **while you drive**, without alt-tabbing out of the game:
+
+* **Global hotkeys** (work in any display mode, even exclusive
+  fullscreen, while the game has focus):
+  `Ctrl+Alt+A` autodrive engage/release, `Ctrl+Alt+R` RELEASE ALL,
+  `Ctrl+Alt+L` limiter on/off, `Ctrl+Alt+S` service stops on/off,
+  `Ctrl+Alt+D` front door, `Ctrl+Alt+W` warning lights.
+* **Overlay** (header link) — a compact frameless always-on-top strip:
+  live speed + mode/target, ENGAGE/RELEASE, DOOR, and STOPS/LIMIT
+  buttons that light green when on. Drag it by the speed number. Like
+  every overlay it can only draw over the game in **borderless /
+  windowed** mode; in exclusive fullscreen use the hotkeys instead.
+* **on top** checkbox — keeps the full panel above the game window.
 
 ## Stream Deck
 

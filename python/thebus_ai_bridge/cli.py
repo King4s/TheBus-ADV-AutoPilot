@@ -78,9 +78,9 @@ def cmd_demo(_args) -> int:
     return 0
 
 
-def cmd_gui(_args) -> int:
+def cmd_gui(args) -> int:
     from .gui import main as gui_main
-    gui_main()
+    gui_main(selftest=getattr(args, "selftest", False))
     return 0
 
 
@@ -144,7 +144,10 @@ def main(argv=None) -> int:
     sub.add_parser("status", help="one-shot connection/state summary")
     sub.add_parser("monitor", help="live dashboard in the terminal")
     sub.add_parser("demo", help="autopilot line-driving demo (Ctrl+C stops)")
-    sub.add_parser("gui", help="control panel (tkinter)")
+    g = sub.add_parser("gui", help="control panel (tkinter) with global "
+                                   "in-game hotkeys and an overlay")
+    g.add_argument("--selftest", action="store_true",
+                   help="open, exercise the overlay, close (smoke test)")
     ap = sub.add_parser("autopilot", help="headless autopilot")
     ap.add_argument("--offset", type=float, default=None,
                     help="km/h relative to the posted limit")
