@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "thebus-ai-bridge"
 version = "0.1.0"
-description = "Advanced autopilot (no AI - deterministic control logic) for The Bus (TML-Studios) via the official telemetry interface, plus developer tooling: virtual-gamepad controls, GUI, Stream Deck plugin, optional MCP server"
+description = "TheBus-ADV-AutoPilot: advanced deterministic autopilot for The Bus (TML-Studios) via the official telemetry interface, with an AI connector for developers (virtual-gamepad controls, GUI, Stream Deck plugin, optional MCP server)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -18,7 +18,7 @@ vision = ["mss>=9.0"]            # screenshots for vision agents
 all = ["vgamepad>=0.1", "mcp>=1.0", "mss>=9.0"]
 
 [project.urls]
-Homepage = "https://github.com/King4s/thebus-ai-connector"
+Homepage = "https://github.com/King4s/TheBus-ADV-AutoPilot"
 
 [project.scripts]
 thebus-ai-bridge = "thebus_ai_bridge.cli:main"

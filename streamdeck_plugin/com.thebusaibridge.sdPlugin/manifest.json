@@ -3,7 +3,7 @@
   "Author": "The Bus AI Connector",
   "Name": "The Bus AI Bridge",
   "Description": "Drive The Bus (TML-Studios) from your Stream Deck: autopilot engage/release, feature toggles, any bus event, live speed display. Needs the game's telemetry interface enabled.",
-  "URL": "https://github.com/King4s/thebus-ai-connector",
+  "URL": "https://github.com/King4s/TheBus-ADV-AutoPilot",
   "Icon": "images/plugin",
   "Category": "The Bus AI Bridge",
   "CategoryIcon": "images/category",

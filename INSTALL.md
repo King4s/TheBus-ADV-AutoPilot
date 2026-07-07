@@ -1,12 +1,12 @@
-# TheBus Copilot — Installation
+# TheBus-ADV-AutoPilot — Installation
 
 *(English below)*
 
-**Avanceret autopilot til The Bus (TML-Studios) — uden AI.** Fart,
-stoppesteder, døre, blinklys og lys styres af deterministisk,
-regelbaseret logik oven på spillets **officielle telemetri-interface**
-— ingen maskinlæring, intet cloud, alt kører lokalt og forudsigeligt.
-Ingen Python nødvendig.
+**Avanceret autopilot til The Bus (TML-Studios).** Fart, stoppesteder,
+døre, blinklys og lys styres af deterministisk, regelbaseret logik oven
+på spillets **officielle telemetri-interface** — alt kører lokalt og
+forudsigeligt, og dine egne pedaler vinder altid. Ingen Python
+nødvendig. (AI-connector-delen til udviklere ligger i kildekoden.)
 
 ## Dansk
 
@@ -39,9 +39,11 @@ aldrig ved exit. Watchdog nulstiller pedalerne, hvis appen dør.
 
 ## English
 
-**Advanced autopilot for The Bus — no AI.** Deterministic, rule-based
+**Advanced autopilot for The Bus.** Deterministic, rule-based
 automation (speed, timetable stops, doors, indicators, lights) on the
-game's official telemetry interface. No machine learning, no cloud.
+game's official telemetry interface — everything runs locally and your
+own pedals always win. (The AI connector for developers lives in the
+source repo.)
 
 1. **In the game:** Options → enable **"Enable Telemetry Interface"**
    → restart the game (once).
@@ -59,4 +61,4 @@ Hotkeys: `Ctrl+Alt+A` autopilot, `R` release all, `L` limiter,
 `S` service stops, `D` front door, `W` warning lights.
 
 Source, docs, Stream Deck plugin & MCP server (for developers):
-https://github.com/King4s/thebus-ai-connector
+https://github.com/King4s/TheBus-ADV-AutoPilot
