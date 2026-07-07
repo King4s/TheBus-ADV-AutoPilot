@@ -365,14 +365,16 @@ class TheBusBridge:
         with self._lock:
             self._vehicle_id = vid
             now = time.monotonic()
-            if self._world is None or now - self._world_at > self.WORLD_REFRESH_S:
+            # >= so a refresh interval of 0 disables caching entirely
+            # (monotonic() ticks coarsely on Windows < 3.13)
+            if self._world is None or now - self._world_at >= self.WORLD_REFRESH_S:
                 try:
                     self._world = self._get("world")
                     self._world_at = now
                 except BridgeError:
                     pass
             if (self._mission is None
-                    or now - self._mission_at > self.MISSION_REFRESH_S):
+                    or now - self._mission_at >= self.MISSION_REFRESH_S):
                 try:
                     self._mission = self._get("mission")
                     self._mission_at = now
