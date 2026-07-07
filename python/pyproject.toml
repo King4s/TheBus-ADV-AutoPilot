@@ -17,6 +17,9 @@ mcp = ["mcp>=1.0"]               # MCP server for LLM agents
 vision = ["mss>=9.0"]            # screenshots for vision agents
 all = ["vgamepad>=0.1", "mcp>=1.0", "mss>=9.0"]
 
+[project.urls]
+Homepage = "https://github.com/King4s/thebus-ai-connector"
+
 [project.scripts]
 thebus-ai-bridge = "thebus_ai_bridge.cli:main"
 
