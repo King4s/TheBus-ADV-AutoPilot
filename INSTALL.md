@@ -2,9 +2,11 @@
 
 *(English below)*
 
-AI-bro til **The Bus** (TML-Studios): autopilot (fart, stoppesteder,
-døre, blinklys, lys), GUI med globale genveje og overlay — oven på
-spillets **officielle telemetri-interface**. Ingen Python nødvendig.
+**Avanceret autopilot til The Bus (TML-Studios) — uden AI.** Fart,
+stoppesteder, døre, blinklys og lys styres af deterministisk,
+regelbaseret logik oven på spillets **officielle telemetri-interface**
+— ingen maskinlæring, intet cloud, alt kører lokalt og forudsigeligt.
+Ingen Python nødvendig.
 
 ## Dansk
 
@@ -36,6 +38,10 @@ Overlay: klik "overlay" øverst i panelet (kræver borderless/windowed).
 aldrig ved exit. Watchdog nulstiller pedalerne, hvis appen dør.
 
 ## English
+
+**Advanced autopilot for The Bus — no AI.** Deterministic, rule-based
+automation (speed, timetable stops, doors, indicators, lights) on the
+game's official telemetry interface. No machine learning, no cloud.
 
 1. **In the game:** Options → enable **"Enable Telemetry Interface"**
    → restart the game (once).

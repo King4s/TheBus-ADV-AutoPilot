@@ -1,10 +1,18 @@
 # The Bus AI Connector
 
-Lets an AI play **The Bus** (TML-Studios): full game telemetry out, bus
-controls in — through the game's **official telemetry interface** (HTTP,
-no memory hacks, no fake keypresses). Works with scripted agents, RL
-loops, vision models, and LLMs (via MCP, so Claude can literally work a
-bus line). Sibling project of
+**An advanced autopilot for The Bus (TML-Studios) — no AI involved.**
+The driving automation is deterministic, rule-based control logic
+(PI speed control, comfort-braking curves, door/timetable state
+machines) on top of the game's **official telemetry interface** (HTTP,
+no memory hacks, no fake keypresses). No machine learning, no neural
+networks, nothing cloud — it reads the same values the dashboard shows
+and reacts predictably.
+
+The "AI" in the name is the *connector* part: the bridge also exposes
+the bus to programmatic drivers — scripted agents, RL loops, vision
+models, and LLMs via an optional MCP server (so Claude *can* work a bus
+line if you wire it up). That part is opt-in developer tooling; the
+autopilot itself never uses it. Sibling project of
 [ets2-ai-connector](../ets2-ai-connector), same architecture adapted to
 what The Bus offers.
 

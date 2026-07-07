@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "thebus-ai-bridge"
 version = "0.1.0"
-description = "Let an AI drive The Bus (TML-Studios): telemetry + events via the official telemetry interface, analog controls via a virtual gamepad, autopilot, GUI, MCP server"
+description = "Advanced autopilot (no AI - deterministic control logic) for The Bus (TML-Studios) via the official telemetry interface, plus developer tooling: virtual-gamepad controls, GUI, Stream Deck plugin, optional MCP server"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
